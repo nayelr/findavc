@@ -4,96 +4,118 @@ import { useChatStore } from './store';
 
 // Use environment variables for API credentials
 const endpoint = import.meta.env.VITE_AZURE_OPENAI_ENDPOINT || 'https://vc.openai.azure.com/';
-const apiKey = import.meta.env.VITE_AZURE_OPENAI_KEY || '';
+const apiKey = import.meta.env.VITE_AZURE_OPENAI_KEY;
 
-const client = new OpenAIClient(
-  endpoint,
-  new AzureKeyCredential(apiKey)
-);
+// Create a function to get the OpenAI client or handle missing API key
+const getOpenAIClient = () => {
+  if (!apiKey) {
+    console.error('Azure OpenAI API key is missing. Please set the VITE_AZURE_OPENAI_KEY environment variable.');
+    throw new Error('Azure OpenAI API key is not configured');
+  }
+  
+  return new OpenAIClient(
+    endpoint,
+    new AzureKeyCredential(apiKey)
+  );
+};
+
+// Only create the client when needed
+let client: OpenAIClient | null = null;
 
 export async function chat(messages: { role: string; content: string }[]) {
-  // Check if we have enough information to show VC recommendations before making the API call
-  const shouldShowRecommendations = shouldShowVCRecommendations(messages, "");
-  
-  // If we have enough information to show recommendations, immediately return a brief response
-  // and trigger the VC recommendations
-  if (shouldShowRecommendations) {
-    try {
-      const vcData = await getVCs();
-      const recommendations = getRecommendedVCs(vcData, 6);
-      const { setVcResults } = useChatStore.getState();
-      setVcResults(recommendations);
-      
-      // Get the last message to check if it's from the user
-      const lastMessage = messages[messages.length - 1];
-      
-      if (lastMessage.role === 'user') {
-        // Return a brief, positive conclusion without asking for more information
-        return "Great! Based on what you've shared about your startup, I've found some VC matches that might be a good fit for you.";
-      } else {
-        // If the last message was from the assistant, just return the original response
-        return lastMessage.content;
+  try {
+    // Check if we have enough information to show VC recommendations before making the API call
+    const shouldShowRecommendations = shouldShowVCRecommendations(messages, "");
+    
+    // If we have enough information to show recommendations, immediately return a brief response
+    // and trigger the VC recommendations
+    if (shouldShowRecommendations) {
+      try {
+        const vcData = await getVCs();
+        const recommendations = getRecommendedVCs(vcData, 6);
+        const { setVcResults } = useChatStore.getState();
+        setVcResults(recommendations);
+        
+        // Get the last message to check if it's from the user
+        const lastMessage = messages[messages.length - 1];
+        
+        if (lastMessage.role === 'user') {
+          // Return a brief, positive conclusion without asking for more information
+          return "Great! Based on what you've shared about your startup, I've found some VC matches that might be a good fit for you.";
+        } else {
+          // If the last message was from the assistant, just return the original response
+          return lastMessage.content;
+        }
+      } catch (error) {
+        console.error('Error getting VC recommendations:', error);
+        return "I'm having trouble processing your request. Please try again later.";
       }
-    } catch (error) {
-      console.error('Error getting VC recommendations:', error);
     }
-  }
-  
-  // If we don't have enough information yet, add a system message to guide the AI
-  let messagesToSend = [...messages];
-  const lastUserMessageIndex = messages.findIndex(msg => msg.role === 'user');
-  
-  // Add a system message to help guide the conversation toward gathering necessary info
-  if (lastUserMessageIndex !== -1) {
-    messagesToSend = [
-      ...messages,
-      {
-        role: 'system',
-        content: 'Focus on gathering essential information about the startup (industry, stage, funding needs) without asking too many questions at once. Once you have enough information, provide a brief conclusion and do not ask for more details.'
-      }
-    ];
-  }
-  
-  const events = await client.streamChatCompletions(
-    'gpt-35-turbo',
-    messagesToSend,
-    { maxTokens: 800 }
-  );
+    
+    // If we don't have enough information yet, add a system message to guide the AI
+    let messagesToSend = [...messages];
+    const lastUserMessageIndex = messages.findIndex(msg => msg.role === 'user');
+    
+    // Add a system message to help guide the conversation toward gathering necessary info
+    if (lastUserMessageIndex !== -1) {
+      messagesToSend = [
+        ...messages,
+        {
+          role: 'system',
+          content: 'Focus on gathering essential information about the startup (industry, stage, funding needs) without asking too many questions at once. Once you have enough information, provide a brief conclusion and do not ask for more details.'
+        }
+      ];
+    }
+    
+    // Initialize the client if it doesn't exist
+    if (!client) {
+      client = getOpenAIClient();
+    }
+    
+    const events = await client.streamChatCompletions(
+      'gpt-35-turbo',
+      messagesToSend,
+      { maxTokens: 800 }
+    );
 
-  let response = '';
-  for await (const event of events) {
-    for (const choice of event.choices) {
-      const content = choice.delta?.content;
-      if (content) {
-        response += content;
+    let response = '';
+    for await (const event of events) {
+      for (const choice of event.choices) {
+        const content = choice.delta?.content;
+        if (content) {
+          response += content;
+        }
       }
     }
-  }
-  
-  // Check if the response contains enough information to show VC recommendations
-  if (shouldShowVCRecommendations(messages, response)) {
-    try {
-      const vcData = await getVCs();
-      const recommendations = getRecommendedVCs(vcData, 6);
-      const { setVcResults } = useChatStore.getState();
-      setVcResults(recommendations);
-      
-      // If the response is asking for more information, replace it with a conclusion
-      if (response.toLowerCase().includes('could you share') || 
-          response.toLowerCase().includes('could you tell me') ||
-          response.toLowerCase().includes('can you provide') ||
-          response.toLowerCase().includes('would you mind')) {
-        return "Great! Based on what you've shared about your startup, I've found some VC matches that might be a good fit for you.";
+    
+    // Check if the response contains enough information to show VC recommendations
+    if (shouldShowVCRecommendations(messages, response)) {
+      try {
+        const vcData = await getVCs();
+        const recommendations = getRecommendedVCs(vcData, 6);
+        const { setVcResults } = useChatStore.getState();
+        setVcResults(recommendations);
+        
+        // If the response is asking for more information, replace it with a conclusion
+        if (response.toLowerCase().includes('could you share') || 
+            response.toLowerCase().includes('could you tell me') ||
+            response.toLowerCase().includes('can you provide') ||
+            response.toLowerCase().includes('would you mind')) {
+          return "Great! Based on what you've shared about your startup, I've found some VC matches that might be a good fit for you.";
+        }
+        
+        // Otherwise return the original response
+        return response;
+      } catch (error) {
+        console.error('Error getting VC recommendations:', error);
       }
-      
-      // Otherwise return the original response
-      return response;
-    } catch (error) {
-      console.error('Error getting VC recommendations:', error);
     }
+    
+    return response;
+  } catch (error) {
+    console.error('Error in chat function:', error);
+    return "I'm having trouble connecting to the service. Please check your API configuration or try again later.";
   }
-  
-  return response;
 }
 
 // Helper function to determine if we should show VC recommendations
