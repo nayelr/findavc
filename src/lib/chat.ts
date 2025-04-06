@@ -41,14 +41,14 @@ export async function chat(messages: { role: string; content: string }[]) {
         
         if (lastMessage.role === 'user') {
           // Return a brief, positive conclusion without asking for more information
-          return "Great! Based on what you've shared about your startup, I've found some VC matches that might be a good fit for you.";
+          return "great! based on what you've shared about your startup, i've found some vc matches that might be a good fit for you.";
         } else {
           // If the last message was from the assistant, just return the original response
           return lastMessage.content;
         }
       } catch (error) {
         console.error('Error getting VC recommendations:', error);
-        return "I'm having trouble processing your request. Please try again later.";
+        return "i'm having trouble processing your request. please try again later.";
       }
     }
     
@@ -62,7 +62,7 @@ export async function chat(messages: { role: string; content: string }[]) {
         ...messages,
         {
           role: 'system',
-          content: 'Focus on gathering essential information about the startup (industry, stage, funding needs) without asking too many questions at once. Once you have enough information, provide a brief conclusion and do not ask for more details.'
+          content: 'always respond in all lowercase like a friend texting. focus on gathering essential information about the startup (industry, stage, funding needs) without asking too many questions at once. use casual language and short sentences. once you have enough information, provide a brief conclusion and do not ask for more details.'
         }
       ];
     }
@@ -101,7 +101,7 @@ export async function chat(messages: { role: string; content: string }[]) {
             response.toLowerCase().includes('could you tell me') ||
             response.toLowerCase().includes('can you provide') ||
             response.toLowerCase().includes('would you mind')) {
-          return "Great! Based on what you've shared about your startup, I've found some VC matches that might be a good fit for you.";
+          return "great! based on what you've shared about your startup, i've found some vc matches that might be a good fit for you.";
         }
         
         // Otherwise return the original response
@@ -114,7 +114,7 @@ export async function chat(messages: { role: string; content: string }[]) {
     return response;
   } catch (error) {
     console.error('Error in chat function:', error);
-    return "I'm having trouble connecting to the service. Please check your API configuration or try again later.";
+    return "i'm having trouble connecting to the service. please check your api configuration or try again later.";
   }
 }
 
