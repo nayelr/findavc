@@ -8,6 +8,7 @@ import { VCResults } from './VCResults';
 export function Chat() {
   const [input, setInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const { messages, addMessage, isLoading, setIsLoading, vcResults } = useChatStore();
   const [hasUserInteracted, setHasUserInteracted] = useState(false);
 
@@ -21,6 +22,17 @@ export function Chat() {
       scrollToBottom();
     }
   }, [messages, vcResults, hasUserInteracted]);
+
+  // Auto-resize textarea based on content
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (textarea) {
+      // Reset height to auto to get the correct scrollHeight
+      textarea.style.height = 'auto';
+      // Set the height to scrollHeight to fit all content
+      textarea.style.height = `${Math.max(60, textarea.scrollHeight)}px`;
+    }
+  }, [input]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,9 +56,18 @@ export function Chat() {
     }
   };
 
+  // Handle keyboard events for the textarea
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Submit on Enter (but not with Shift+Enter which creates a new line)
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmit(e as unknown as React.FormEvent);
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-zinc-900 flex flex-col items-center justify-center p-4">
-      <div className="w-full max-w-3xl space-y-8">
+    <div className="min-h-screen bg-zinc-900 flex flex-col items-center justify-center p-4 pb-16">
+      <div className="w-full max-w-4xl space-y-8">
         <div className="flex flex-col space-y-4">
           {/* Find VCs trigger response index */}
           {(() => {
@@ -70,11 +91,11 @@ export function Chat() {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     style={{ fontFamily: "'Cormorant Garamond', serif" }}
-                    className={`p-4 rounded-lg ${
+                    className={`p-5 rounded-lg text-lg ${
                       message.role === 'assistant'
                         ? 'bg-zinc-800/50 text-zinc-200'
                         : 'bg-zinc-700/30 text-zinc-300 ml-auto'
-                    } max-w-[80%]`}
+                    } max-w-[85%]`}
 
                   >
                     {message.content}
@@ -113,11 +134,11 @@ export function Chat() {
                     initial={{ opacity: 0, y: 20 }}
                     animate={{ opacity: 1, y: 0 }}
                     style={{ fontFamily: "'Cormorant Garamond', serif" }}
-                    className={`p-4 rounded-lg ${
+                    className={`p-5 rounded-lg text-lg ${
                       message.role === 'assistant'
                         ? 'bg-zinc-800/50 text-zinc-200'
                         : 'bg-zinc-700/30 text-zinc-300 ml-auto'
-                    } max-w-[80%]`}
+                    } max-w-[85%]`}
 
                   >
                     {message.content}
@@ -134,7 +155,7 @@ export function Chat() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             style={{ fontFamily: "'Cormorant Garamond', serif" }}
-            className="bg-zinc-800/50 p-4 rounded-lg text-zinc-400"
+            className="bg-zinc-800/50 p-5 rounded-lg text-lg text-zinc-400"
 
           >
             thinking...
@@ -144,22 +165,28 @@ export function Chat() {
 
         {/* Input form always at the bottom */}
         <form onSubmit={handleSubmit} className="relative sticky bottom-4" onClick={() => setHasUserInteracted(true)}>
-          <input
-            type="text"
+          <textarea
+            ref={textareaRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onClick={() => setHasUserInteracted(true)}
+            onKeyDown={handleKeyDown}
             placeholder={vcResults && vcResults.length > 0 ? "ask more about these vcs..." : "tell us about your startup..."}
-            style={{ fontFamily: "'Cormorant Garamond', serif" }}
-            className="w-full p-4 pr-12 bg-transparent border border-zinc-700 rounded-lg text-zinc-200 focus:outline-none focus:border-zinc-500 transition-colors"
-
+            style={{ 
+              fontFamily: "'Cormorant Garamond', serif",
+              resize: "none",
+              overflow: "hidden",
+              minHeight: "60px"
+            }}
+            rows={1}
+            className="w-full p-5 pr-14 bg-transparent border border-zinc-700 rounded-lg text-lg text-zinc-200 focus:outline-none focus:border-zinc-500 transition-colors"
           />
           <button
             type="submit"
             disabled={isLoading}
-            className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-200 transition-colors disabled:opacity-50"
+            className="absolute right-5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-200 transition-colors disabled:opacity-50"
           >
-            <Send size={20} />
+            <Send size={24} />
           </button>
         </form>
       </div>
